@@ -25,7 +25,7 @@ const DriverScreen = () => {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [locationSubscription, setLocationSubscription] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [busNumber, setBusNumber] = useState('BUS001'); // Will sync from profile when available
+  const [busNumber, setBusNumber] = useState(null);
 
   useEffect(() => {
     initializeLocation();
@@ -38,7 +38,7 @@ const DriverScreen = () => {
 
   // Sync bus number from user profile when it loads/changes
   useEffect(() => {
-    if (userProfile?.busNumber && busNumber !== userProfile.busNumber) {
+    if (userProfile?.busNumber) {
       setBusNumber(userProfile.busNumber);
     }
   }, [userProfile?.busNumber]);
@@ -59,6 +59,10 @@ const DriverScreen = () => {
   };
 
   const startTracking = async () => {
+    if (!busNumber) {
+      Alert.alert('Missing Bus Number', 'Please set your Bus Number in your profile first.');
+      return;
+    }
     if (!currentLocation) {
       Alert.alert('Error', 'Unable to get current location');
       return;
@@ -70,6 +74,9 @@ const DriverScreen = () => {
       if (!driverId) {
         throw new Error('No logged in user');
       }
+      // Send an immediate location update so students see you right away
+      updateBusLocation(driverId, currentLocation, busNumber);
+
       // Start location tracking
       const subscription = await startLocationTracking((location) => {
         setCurrentLocation(location);

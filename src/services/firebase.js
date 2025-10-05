@@ -121,6 +121,17 @@ export const listenToUserProfile = (uid, callback) => {
   return () => off(userRef);
 };
 
-// Listen to all active buses (for "All Buses" view)
+// Students mark themselves as waiting at a saved stop for a bus
+// Schema: waiting/{busNumber}/{stopKey}/{uid} = true | null
+// stopKey can be from stop.id or coordinates; we use lat_lon when id not present
+export const setStudentWaiting = async (uid, busNumber, stop, isWaiting) => {
+  if (!uid || !busNumber || !stop) return;
+  const stopKey = stop.id
+    ? String(stop.id)
+    : `${Number(stop.latitude).toFixed(6)},${Number(stop.longitude).toFixed(6)}`;
+  const waitingRef = ref(database, `waiting/${busNumber}/${stopKey}/${uid}`);
+  return set(waitingRef, isWaiting ? true : null);
+};
 
+// Listen to all active buses (for "All Buses" view)
 export { auth, database }; 

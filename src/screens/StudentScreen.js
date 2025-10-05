@@ -6,9 +6,10 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { getBusLocation } from '../services/firebase';
+import { getBusLocation, setStudentWaiting } from '../services/firebase';
 import {
   requestLocationPermission,
   getCurrentLocation,
@@ -28,6 +29,9 @@ const StudentScreen = () => {
   // Route ETA (map-driven) not used in the pre-feature version
   const [loading, setLoading] = useState(true);
   const [selectedStop, setSelectedStop] = useState(null);
+  const [pinLocation, setPinLocation] = useState(null);
+  const [isWaiting, setIsWaiting] = useState(false);
+  const [markPrompted, setMarkPrompted] = useState(false);
   
 
   // Sample bus stops - in a real app, these would come from a database
@@ -43,6 +47,50 @@ const StudentScreen = () => {
       // Cleanup Firebase listeners if needed
     };
   }, []);
+
+  const toggleWaiting = async () => {
+    try {
+      const busNumber = userProfile?.busNumber;
+      if (!user?.uid || !busNumber || !selectedStop) {
+        Alert.alert('Missing info', 'Make sure your profile has a bus number and a saved stop.');
+        return;
+      }
+      const next = !isWaiting;
+      setIsWaiting(next);
+      await setStudentWaiting(user.uid, busNumber, selectedStop, next);
+    } catch (e) {
+      setIsWaiting((prev) => !prev); // revert
+      Alert.alert('Error', 'Failed to update waiting status.');
+    }
+  };
+
+  // Initialize student's saved stop from profile
+  useEffect(() => {
+    const lat = userProfile?.busStopLat;
+    const lon = userProfile?.busStopLon;
+    const name = userProfile?.busStopName || 'My Stop';
+    if (typeof lat === 'number' && typeof lon === 'number') {
+      const stop = { id: 'saved', name, latitude: lat, longitude: lon };
+      setSelectedStop(stop);
+      setPinLocation({ latitude: lat, longitude: lon });
+      if (busLocation) calculateETAForSelectedStop(busLocation);
+      // After login/return, prompt once to re-mark stop so user can center map
+      if (!markPrompted) {
+        setMarkPrompted(true);
+        Alert.alert(
+          'Mark my stop',
+          'Do you want to highlight your saved stop on the map?',
+          [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Mark my stop',
+              onPress: () => setPinLocation({ latitude: lat, longitude: lon }),
+            },
+          ]
+        );
+      }
+    }
+  }, [userProfile?.busStopLat, userProfile?.busStopLon, userProfile?.busStopName]);
 
   const initializeApp = async () => {
     try {
@@ -150,9 +198,11 @@ const StudentScreen = () => {
         region={region}
         userLocation={userLocation}
         busLocation={busLocation}
+        pinLocation={pinLocation}
       />
 
       <View style={styles.overlay}>
+        <ScrollView contentContainerStyle={styles.overlayContent}>
         <View style={styles.statusContainer}>
           <Text style={styles.statusTitle}>
             {busLocation ? '🟢 Bus Active' : '🔴 No Bus Available'}
@@ -166,32 +216,10 @@ const StudentScreen = () => {
 
         
 
-        {busLocation && (
+        {busLocation && selectedStop && (
           <View style={styles.etaContainer}>
-            <Text style={styles.etaTitle}>Select a stop to see ETA:</Text>
-            <View style={styles.stopsContainer}>
-              {busStops.map((stop) => (
-                <TouchableOpacity
-                  key={stop.id}
-                  style={[
-                    styles.stopButton,
-                    selectedStop?.id === stop.id && styles.selectedStopButton,
-                  ]}
-                  onPress={() => handleStopSelection(stop)}
-                >
-                  <Text
-                    style={[
-                      styles.stopButtonText,
-                      selectedStop?.id === stop.id && styles.selectedStopButtonText,
-                    ]}
-                  >
-                    {stop.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {selectedStop && eta && (
+            <Text style={styles.etaTitle}>Your stop: {selectedStop.name}</Text>
+            {eta !== null && (
               <View style={styles.etaInfo}>
                 <Text style={styles.etaText}>
                   ETA to {selectedStop.name}: {formatETA(eta)}
@@ -205,6 +233,16 @@ const StudentScreen = () => {
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
+
+        {selectedStop && (
+          <TouchableOpacity
+            style={[styles.waitingButton, isWaiting ? styles.waitingOn : styles.waitingOff]}
+            onPress={toggleWaiting}
+          >
+            <Text style={styles.waitingText}>{isWaiting ? "I'm no longer waiting" : "I'm waiting at my stop"}</Text>
+          </TouchableOpacity>
+        )}
+        </ScrollView>
       </View>
       <FooterNav />
     </View>
@@ -234,10 +272,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 100, // keep clear of FooterNav
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    maxHeight: '60%',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 6,
+  },
+  overlayContent: {
+    paddingBottom: 12,
   },
   statusContainer: {
     alignItems: 'center',
@@ -303,6 +352,22 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#666',
     fontSize: 14,
+  },
+  waitingButton: {
+    marginTop: 6,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  waitingOn: {
+    backgroundColor: '#FF7043',
+  },
+  waitingOff: {
+    backgroundColor: '#4CAF50',
+  },
+  waitingText: {
+    color: '#fff',
+    fontWeight: '700',
   },
   busMarker: {
     backgroundColor: '#2196F3',

@@ -72,7 +72,6 @@ export const getCurrentLocation = async () => {
       timestamp: location.timestamp
     };
   } catch (error) {
-    console.error('Error getting current location:', error);
     throw error;
   }
 };
@@ -83,8 +82,8 @@ export const startLocationTracking = async (callback) => {
     const locationSubscription = await Location.watchPositionAsync(
       {
         accuracy: Location.Accuracy.High,
-        timeInterval: 10000,
-        distanceInterval: 10
+        timeInterval: 3000,
+        distanceInterval: 5
       },
       (location) => {
         const locationData = {
@@ -102,4 +101,4 @@ export const startLocationTracking = async (callback) => {
     console.error('Error starting location tracking:', error);
     throw error;
   }
-}; 
+};

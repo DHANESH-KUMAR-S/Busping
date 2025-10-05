@@ -4,15 +4,21 @@ import { WebView } from 'react-native-webview';
 import WebMap from './WebMap';
 
 // Leaflet + OpenStreetMap rendered inside a WebView so it works in Expo Go without API keys
-const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, onMapTap }) => {
+const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, autoFit = false, style, onMapTap }) => {
   const webRef = useRef(null);
 
-  const initialState = useMemo(() => {
-    const lat = region?.latitude ?? 37.78825;
-    const lon = region?.longitude ?? -122.4324;
+  // Compute the initial center once: prefer student's saved pin, then region, else default
+  const initialStateRef = useRef(null);
+  if (!initialStateRef.current) {
+    const baseLat = (pinLocation && typeof pinLocation.latitude === 'number')
+      ? pinLocation.latitude
+      : (region?.latitude ?? 37.78825);
+    const baseLon = (pinLocation && typeof pinLocation.longitude === 'number')
+      ? pinLocation.longitude
+      : (region?.longitude ?? -122.4324);
     const zoom = region?.latitudeDelta ? Math.max(4, 16 - Math.log2(region.latitudeDelta / 0.01)) : 14;
-    return { lat, lon, zoom };
-  }, [region?.latitude, region?.longitude, region?.latitudeDelta]);
+    initialStateRef.current = { lat: baseLat, lon: baseLon, zoom };
+  }
 
   const [mapReady, setMapReady] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
@@ -33,6 +39,11 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
         <style>
           html, body, #map { height: 100%; margin: 0; padding: 0; }
           .leaflet-container { background: #f0f0f0; }
+          .bus-pin {
+            width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+            font-size: 20px; line-height: 28px; border-radius: 50%;
+            background: #1976d2; color: #fff; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+          }
           </style>
       </head>
       <body>
@@ -45,7 +56,7 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
             } next();
           }
 
-          const initial = ${JSON.stringify(initialState)};
+          const initial = ${JSON.stringify(initialStateRef.current)};
           const initialBus = null;
           const initialUser = null;
           function init(){
@@ -56,10 +67,11 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
                 attribution: '&copy; OpenStreetMap contributors'
               }).addTo(map);
 
-              const busIcon = L.icon({
-                iconUrl: 'https://cdn-icons-png.flaticon.com/512/61/61212.png',
+              const busIcon = L.divIcon({
+                html: '<div class="bus-pin">🚌</div>',
+                className: '',
                 iconSize: [28, 28],
-                iconAnchor: [14, 28],
+                iconAnchor: [14, 14],
               });
               const userIcon = L.icon({
                 iconUrl: 'https://cdn-icons-png.flaticon.com/512/64/64113.png',
@@ -70,6 +82,8 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
               let busMarker = null;
               let userMarker = null;
               let didFit = false;
+              let routeLine = null;
+              let lastRouteKey = '';
               let pinMarker = null;
 
               function setBus(lat, lon) {
@@ -86,6 +100,26 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
                   map.fitBounds(group.getBounds().pad(0.25));
                   didFit = true;
                 }
+              }
+
+              async function updateRoute(bus, pin) {
+                if (!bus || !pin) return;
+                try {
+                  const key = bus.latitude.toFixed(5) + ',' + bus.longitude.toFixed(5) + '->' + pin.latitude.toFixed(5) + ',' + pin.longitude.toFixed(5);
+                  if (key === lastRouteKey) return;
+                  lastRouteKey = key;
+                  const url = 'https://router.project-osrm.org/route/v1/driving/' + bus.longitude + ',' + bus.latitude + ';' + pin.longitude + ',' + pin.latitude + '?overview=full&geometries=geojson';
+                  const res = await fetch(url);
+                  const json = await res.json();
+                  var coords = null;
+                  if (json && json.routes && json.routes.length > 0 && json.routes[0].geometry && json.routes[0].geometry.coordinates) {
+                    coords = json.routes[0].geometry.coordinates;
+                  }
+                  if (!coords) return;
+                  const latlngs = coords.map(([lng, lat]) => [lat, lng]);
+                  if (routeLine) { routeLine.setLatLngs(latlngs); }
+                  else { routeLine = L.polyline(latlngs, { color: '#1976d2', weight: 5, opacity: 0.85 }).addTo(map); }
+                } catch (_) { /* ignore routing errors */ }
               }
 
               // Signal ready
@@ -114,6 +148,8 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
                     if (pinMarker) { pinMarker.setLatLng([data.pin.latitude, data.pin.longitude]); }
                     else { pinMarker = L.marker([data.pin.latitude, data.pin.longitude]).addTo(map); }
                   }
+                  // draw/update route line if both bus and pin exist
+                  if (data.bus && data.pin) { updateRoute(data.bus, data.pin); }
                   if (data.fit && !didFit) fitBoundsIfBoth();
                 } catch (e) { /* ignore */ }
               }
@@ -131,14 +167,14 @@ const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, 
         </script>
       </body>
     </html>
-  `, [initialState]);
+  `, []);
 
   useEffect(() => {
     // Send updates to the WebView by invoking the exposed function
     const payload = {
       bus: busLocation || null,
       user: userLocation || null,
-      fit: true,
+      fit: Boolean(autoFit),
     };
     if (pinLocation) payload.pin = pinLocation;
     if (webRef.current && payload) {

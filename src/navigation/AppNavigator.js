@@ -12,6 +12,7 @@ import DriverScreen from '../screens/DriverScreen';
 import StudentScreen from '../screens/StudentScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import LoadingScreen from '../screens/LoadingScreen';
+import StopPickerScreen from '../screens/StopPickerScreen';
 
 const Stack = createStackNavigator();
 
@@ -64,3 +65,5 @@ const AppNavigator = () => {
     </NavigationContainer>
   );
 };
+
+export default AppNavigator;
