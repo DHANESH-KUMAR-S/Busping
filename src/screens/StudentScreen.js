@@ -14,8 +14,9 @@ import {
   requestLocationPermission,
   getCurrentLocation,
   calculateDistance,
-  calculateETA,
+  calculateETAFloat,
   formatETA,
+  formatDistance,
 } from '../utils/location';
 import { ERROR_MESSAGES } from '../constants';
 import OSMMap from '../components/OSMMap';
@@ -26,6 +27,7 @@ const StudentScreen = () => {
   const [busLocation, setBusLocation] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [eta, setEta] = useState(null);
+  const [distanceKm, setDistanceKm] = useState(null);
   // Route ETA (map-driven) not used in the pre-feature version
   const [loading, setLoading] = useState(true);
   const [selectedStop, setSelectedStop] = useState(null);
@@ -137,8 +139,12 @@ const StudentScreen = () => {
       selectedStop.longitude
     );
 
-    const etaMinutes = calculateETA(distance);
-    setEta(etaMinutes);
+    // Use float ETA for responsiveness; store as rounded minutes for legacy format,
+    // but prefer formatting with 1 decimal when under 10 minutes
+    const etaMinFloat = calculateETAFloat(distance);
+    const etaMinutes = Math.round(etaMinFloat);
+    setEta(etaMinFloat);
+    setDistanceKm(distance);
   };
 
   const handleStopSelection = (stop) => {
@@ -147,6 +153,13 @@ const StudentScreen = () => {
       calculateETAForSelectedStop(busLocation);
     }
   };
+
+  // Recompute ETA/distance whenever bus moves or stop changes
+  useEffect(() => {
+    if (busLocation && selectedStop) {
+      calculateETAForSelectedStop(busLocation);
+    }
+  }, [busLocation?.latitude, busLocation?.longitude, selectedStop?.latitude, selectedStop?.longitude]);
 
   
 
@@ -219,11 +232,14 @@ const StudentScreen = () => {
         {busLocation && selectedStop && (
           <View style={styles.etaContainer}>
             <Text style={styles.etaTitle}>Your stop: {selectedStop.name}</Text>
-            {eta !== null && (
+            {(eta !== null || distanceKm !== null) && (
               <View style={styles.etaInfo}>
-                <Text style={styles.etaText}>
-                  ETA to {selectedStop.name}: {formatETA(eta)}
-                </Text>
+                {distanceKm !== null && (
+                  <Text style={styles.etaText}>Distance: {formatDistance(distanceKm)}</Text>
+                )}
+                {eta !== null && (
+                  <Text style={styles.etaText}>ETA: {eta < 10 ? `${eta.toFixed(1)} min` : formatETA(Math.round(eta))}</Text>
+                )}
               </View>
             )}
             

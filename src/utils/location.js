@@ -14,11 +14,27 @@ export const calculateDistance = (lat1, lon1, lat2, lon2) => {
   return distance;
 };
 
+// Format distance given in kilometers to a human-friendly string
+export const formatDistance = (km) => {
+  if (km < 1) {
+    const meters = Math.round(km * 1000);
+    return `${meters} m`;
+  }
+  return `${km.toFixed(1)} km`;
+};
+
 // Calculate ETA based on distance and average speed (km/h)
 export const calculateETA = (distance, averageSpeed = 30) => {
   const timeInHours = distance / averageSpeed;
   const timeInMinutes = Math.round(timeInHours * 60);
   return timeInMinutes;
+};
+
+// Calculate ETA with decimal minutes precision (e.g., 2.4 minutes)
+export const calculateETAFloat = (distance, averageSpeed = 30) => {
+  const timeInHours = distance / averageSpeed;
+  const timeInMinutes = timeInHours * 60;
+  return timeInMinutes; // caller can format to desired precision
 };
 
 // Format ETA for display
