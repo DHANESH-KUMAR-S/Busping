@@ -25,11 +25,14 @@ const ProfileSetupScreen = ({ navigation }) => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [busNumber, setBusNumber] = useState('');
   
-  // Student specific field
+  // Student stop selection (from map picker)
   const [busStopName, setBusStopName] = useState('');
+  const [busStopLat, setBusStopLat] = useState(null);
+  const [busStopLon, setBusStopLon] = useState(null);
   
-  // Driver specific field
+  // Driver specific fields
   const [driverLicense, setDriverLicense] = useState('');
+  const [busPlateNumber, setBusPlateNumber] = useState('');
 
   const handleProfileSetup = async () => {
     if (!name || !phoneNumber || !busNumber) {
@@ -37,13 +40,13 @@ const ProfileSetupScreen = ({ navigation }) => {
       return;
     }
 
-    if (userRole === USER_ROLES.STUDENT && !busStopName) {
-      Alert.alert('Error', 'Please enter your bus stop name');
+    if (userRole === USER_ROLES.STUDENT && (!busStopName || typeof busStopLat !== 'number' || typeof busStopLon !== 'number')) {
+      Alert.alert('Error', 'Please pick your bus stop on the map');
       return;
     }
 
-    if (userRole === USER_ROLES.DRIVER && !driverLicense) {
-      Alert.alert('Error', 'Please enter your driver license number');
+    if (userRole === USER_ROLES.DRIVER && (!driverLicense || !busPlateNumber)) {
+      Alert.alert('Error', 'Please enter your license and bus plate number');
       return;
     }
 
@@ -54,8 +57,8 @@ const ProfileSetupScreen = ({ navigation }) => {
         name,
         phoneNumber,
         busNumber,
-        ...(userRole === USER_ROLES.DRIVER ? { driverLicense } : {}),
-        ...(userRole === USER_ROLES.STUDENT ? { busStopName } : {}),
+        ...(userRole === USER_ROLES.DRIVER ? { driverLicense, busPlateNumber } : {}),
+        ...(userRole === USER_ROLES.STUDENT ? { busStopName, busStopLat, busStopLon } : {}),
       };
 
       await saveUserProfile(user.uid, profile);
@@ -130,19 +133,43 @@ const ProfileSetupScreen = ({ navigation }) => {
                 onChangeText={setDriverLicense}
                 autoCapitalize="characters"
               />
+              <TextInput
+                style={styles.input}
+                placeholder="Bus Plate Number *"
+                value={busPlateNumber}
+                onChangeText={setBusPlateNumber}
+                autoCapitalize="characters"
+              />
             </>
           )}
 
           {userRole === USER_ROLES.STUDENT && (
             <>
               <Text style={styles.sectionTitle}>Student Information</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Bus Stop Name *"
-                value={busStopName}
-                onChangeText={setBusStopName}
-                autoCapitalize="words"
-              />
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={() => {
+                  navigation.navigate('StopPicker', {
+                    onSelect: ({ busStopName: name, busStopLat: lat, busStopLon: lon }) => {
+                      setBusStopName(name);
+                      setBusStopLat(lat);
+                      setBusStopLon(lon);
+                    },
+                  });
+                }}
+              >
+                <Text style={styles.secondaryButtonText}>{busStopName ? 'Change Stop on Map' : 'Pick Stop on Map'}</Text>
+              </TouchableOpacity>
+              {busStopName ? (
+                <View style={styles.selectionBox}>
+                  <Text style={styles.infoText}>Selected: {busStopName}</Text>
+                  {typeof busStopLat === 'number' && typeof busStopLon === 'number' && (
+                    <Text style={styles.infoText}>
+                      {busStopLat.toFixed(5)}, {busStopLon.toFixed(5)}
+                    </Text>
+                  )}
+                </View>
+              ) : null}
             </>
           )}
 
@@ -276,6 +303,24 @@ const styles = StyleSheet.create({
     color: '#1976d2',
     marginBottom: 5,
     lineHeight: 20,
+  },
+  selectionBox: {
+    backgroundColor: '#f0f7ff',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  secondaryButton: {
+    marginTop: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  secondaryButtonText: {
+    color: '#2196F3',
+    fontWeight: '600',
   },
 });
 

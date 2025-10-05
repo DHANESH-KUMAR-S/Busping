@@ -1,8 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { useAuth } from '../context/AuthContext';
 import { USER_ROLES } from '../constants';
+import { useAuth } from '../context/AuthContext';
 
 // Import screens
 import LoginScreen from '../screens/LoginScreen';
@@ -26,74 +26,41 @@ const AppNavigator = () => {
     <NavigationContainer>
       <Stack.Navigator
         screenOptions={{
-          headerStyle: {
-            backgroundColor: '#2196F3',
-          },
+          headerStyle: { backgroundColor: '#2196F3' },
           headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerTitleStyle: { fontWeight: 'bold' },
         }}
       >
         {!user ? (
-          // Auth screens
-          <Stack.Screen 
-            name="Login" 
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
+          <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
         ) : !userRole ? (
-          // Role selection
-          <Stack.Screen 
-            name="RoleSelection" 
-            component={RoleSelectionScreen}
-            options={{ title: 'Select Your Role' }}
-          />
+          <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} options={{ title: 'Select Your Role' }} />
         ) : !profileCompleted ? (
-          // Profile setup
-          <Stack.Screen 
-            name="ProfileSetup" 
+          <Stack.Screen
+            name="ProfileSetup"
             component={ProfileSetupScreen}
-            options={{ 
-              title: 'Profile Setup',
-              headerLeft: () => null,
-              gestureEnabled: false
-            }}
+            options={{ title: 'Profile Setup', headerLeft: () => null, gestureEnabled: false }}
           />
         ) : (
-          // Main app screens based on role
           <>
             {userRole === USER_ROLES.DRIVER ? (
-              <Stack.Screen 
-                name="Driver" 
+              <Stack.Screen
+                name="Driver"
                 component={DriverScreen}
-                options={{ 
-                  title: 'Bus Tracking',
-                  headerLeft: () => null,
-                  gestureEnabled: false
-                }}
+                options={{ title: 'Bus Tracking', headerLeft: () => null, gestureEnabled: false }}
               />
             ) : (
-              <Stack.Screen 
-                name="Student" 
+              <Stack.Screen
+                name="Student"
                 component={StudentScreen}
-                options={{ 
-                  title: 'Bus Tracker',
-                  headerLeft: () => null,
-                  gestureEnabled: false
-                }}
+                options={{ title: 'Bus Tracker', headerLeft: () => null, gestureEnabled: false }}
               />
             )}
-            <Stack.Screen
-              name="Profile"
-              component={ProfileScreen}
-              options={{ title: 'Profile' }}
-            />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
           </>
         )}
+        <Stack.Screen name="StopPicker" component={StopPickerScreen} options={{ title: 'Pick Bus Stop' }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
-
-export default AppNavigator; 

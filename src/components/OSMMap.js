@@ -4,7 +4,7 @@ import { WebView } from 'react-native-webview';
 import WebMap from './WebMap';
 
 // Leaflet + OpenStreetMap rendered inside a WebView so it works in Expo Go without API keys
-const OSMMap = ({ region, userLocation, busLocation, style }) => {
+const OSMMap = ({ region, userLocation, busLocation, pinLocation = null, style, onMapTap }) => {
   const webRef = useRef(null);
 
   const initialState = useMemo(() => {
@@ -70,6 +70,7 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
               let busMarker = null;
               let userMarker = null;
               let didFit = false;
+              let pinMarker = null;
 
               function setBus(lat, lon) {
                 if (busMarker) { busMarker.setLatLng([lat, lon]); }
@@ -90,6 +91,15 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
               // Signal ready
               try { if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' })); } } catch(_) {}
 
+              // Optional: report taps to RN
+              try {
+                map.on('click', function(e){
+                  if (!window.ReactNativeWebView) return;
+                  const p = { type: 'tap', latitude: e.latlng.lat, longitude: e.latlng.lng };
+                  window.ReactNativeWebView.postMessage(JSON.stringify(p));
+                });
+              } catch(_) {}
+
               // Expose a global function for RN to call via injectJavaScript
               window.__updateFromRN = function(payload) {
                 try {
@@ -99,6 +109,10 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
                   }
                   if (data.user && typeof data.user.latitude === 'number' && typeof data.user.longitude === 'number') {
                     setUser(data.user.latitude, data.user.longitude);
+                  }
+                  if (data.pin && typeof data.pin.latitude === 'number' && typeof data.pin.longitude === 'number') {
+                    if (pinMarker) { pinMarker.setLatLng([data.pin.latitude, data.pin.longitude]); }
+                    else { pinMarker = L.marker([data.pin.latitude, data.pin.longitude]).addTo(map); }
                   }
                   if (data.fit && !didFit) fitBoundsIfBoth();
                 } catch (e) { /* ignore */ }
@@ -126,6 +140,7 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
       user: userLocation || null,
       fit: true,
     };
+    if (pinLocation) payload.pin = pinLocation;
     if (webRef.current && payload) {
       const escaped = JSON.stringify(payload).replace(/\\/g, '\\\\').replace(/`/g, '\\`');
       const js = `window.__updateFromRN && window.__updateFromRN(${escaped}); true;`;
@@ -133,7 +148,7 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
         webRef.current.injectJavaScript(js);
       } catch (_) { /* ignore */ }
     }
-  }, [busLocation?.latitude, busLocation?.longitude, userLocation?.latitude, userLocation?.longitude]);
+  }, [busLocation?.latitude, busLocation?.longitude, userLocation?.latitude, userLocation?.longitude, pinLocation?.latitude, pinLocation?.longitude]);
 
   if (Platform.OS === 'web' || (timedOut && !mapReady)) {
     // Web already has WebMap placeholder; keep behavior the same
@@ -146,7 +161,6 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
       style={[{ flex: 1 }, style]}
       originWhitelist={["*"]}
       source={{ html }}
-      javaScriptEnabled
       domStorageEnabled
       allowFileAccess
       allowUniversalAccessFromFileURLs
@@ -162,13 +176,14 @@ const OSMMap = ({ region, userLocation, busLocation, style }) => {
             // Keep WebView, but allow outer timeout to fallback if not ready
             return;
           }
-          if (data.type === 'route' && typeof onRouteUpdate === 'function') {
-            onRouteUpdate({ etaMinutes: data.etaMinutes, distanceMeters: data.distanceMeters });
+          if (data.type === 'tap' && typeof onMapTap === 'function') {
+            onMapTap({ latitude: data.latitude, longitude: data.longitude });
+            return;
           }
         } catch (_) { /* ignore */ }
       }}
     />
   );
-};
+}
 
 export default OSMMap;
