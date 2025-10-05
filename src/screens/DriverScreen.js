@@ -16,7 +16,7 @@ import {
 } from '../utils/location';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '../constants';
 import DemoControls from '../components/DemoControls';
-import WebMap from '../components/WebMap';
+import OSMMap from '../components/OSMMap';
 import FooterNav from '../components/FooterNav';
 
 const DriverScreen = () => {
@@ -154,16 +154,14 @@ const DriverScreen = () => {
 
   return (
     <View style={styles.container}>
-      <WebMap style={styles.map} region={region}>
-        {currentLocation && (
-          <View style={styles.markerContainer}>
-            <Text style={styles.markerText}>🚌 Bus Location</Text>
-            <Text style={styles.markerCoords}>
-              {currentLocation.latitude.toFixed(4)}, {currentLocation.longitude.toFixed(4)}
-            </Text>
-          </View>
-        )}
-      </WebMap>
+      <OSMMap
+        style={styles.map}
+        region={region}
+        userLocation={currentLocation}
+        busLocation={null}
+        pinLocation={null}
+        autoFit={false}
+      />
 
       <View style={styles.overlay}>
         <View style={styles.statusContainer}>
@@ -223,10 +221,17 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.97)',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 100, // keep clear of FooterNav
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -2 },
+    elevation: 6,
   },
   statusContainer: {
     alignItems: 'center',
@@ -272,23 +277,6 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 14,
   },
-  markerContainer: {
-    backgroundColor: '#2196F3',
-    padding: 10,
-    borderRadius: 5,
-    margin: 10,
-    alignItems: 'center',
-  },
-  markerText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  markerCoords: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 2,
-  },
 });
 
-export default DriverScreen; 
+export default DriverScreen;
